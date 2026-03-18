@@ -12,3 +12,4 @@ __pycache__/
 # arquivos do sistema
 .DS_Store
 Thumbs.db
+.env
