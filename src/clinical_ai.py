@@ -1,31 +1,54 @@
 from openai import OpenAI
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def analisar_consulta(texto):
 
     prompt = f"""
-Você é um dermatologista especialista.
+Você é um dermatologista experiente.
 
-Analise a consulta abaixo e gere:
+Analise a consulta abaixo e produza um PRONTUÁRIO DERMATOLÓGICO DETALHADO.
 
-1. Prontuário dermatológico estruturado
-2. Diagnóstico provável
+Regras:
+
+- Use linguagem médica
+- Não resuma excessivamente
+- Estruture o texto claramente
+- Não escreva "não informado"
+- Se alguma informação não estiver presente simplesmente omita
+
+Estrutura desejada:
+
+1. História clínica
+Descreva início da lesão, evolução, sintomas associados, fatores desencadeantes.
+
+2. Exame dermatológico
+Descreva morfologia, cor, superfície, bordas, localização anatômica.
+
 3. Diagnósticos diferenciais
-4. Sugestão de exames complementares
-5. Conduta terapêutica inicial baseada em evidências
+Liste diagnósticos possíveis em dermatologia.
+
+4. Diagnóstico mais provável
+Explique brevemente.
+
+5. CID provável
+Informe o CID-10 compatível.
+
+6. Conduta sugerida
+Inclua investigação, tratamento ou necessidade de biópsia.
 
 Consulta:
+
 {texto}
 """
 
-    response = client.responses.create(
-        model="gpt-4.1",
-        input=prompt
+    resposta = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3
     )
 
-    return response.output_text
+    return resposta.choices[0].message.content

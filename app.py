@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 import tempfile
+import re
 from streamlit_mic_recorder import mic_recorder
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -11,12 +12,15 @@ from src.image_analysis import analisar_imagem
 from src.lesion_detection import detectar_lesao
 from src.pathology_interpreter import interpretar_laudo
 from src.melanoma_abcd import analisar_abcd
+from src.biopsy_request import gerar_pedido_biopsia
+from src.patient_report import gerar_laudo_paciente
 
 
 st.set_page_config(page_title="Derm AI Copilot", layout="wide")
 
 st.title("Derm AI Copilot")
 st.write("Assistente dermatológico com IA")
+
 
 # ----------------------------
 # SESSION STATE
@@ -43,6 +47,26 @@ if "transcricao_total" not in st.session_state:
 if "analise_total" not in st.session_state:
     st.session_state.analise_total = ""
 
+if "camera_ativa" not in st.session_state:
+    st.session_state.camera_ativa = False
+
+
+# ----------------------------
+# LIMPAR TEXTO
+# ----------------------------
+
+def limpar_texto(texto):
+
+    texto = texto.replace("*", "")
+    texto = texto.replace("Identificação:", "")
+
+    texto = re.sub(r"Nome:.*não informado.*", "", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"Sexo:.*não informado.*", "", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"Idade:.*não informado.*", "", texto, flags=re.IGNORECASE)
+
+    return texto.strip()
+
+
 # ----------------------------
 # CALCULAR IDADE
 # ----------------------------
@@ -57,8 +81,9 @@ def calcular_idade(data_nascimento):
 
     return idade
 
+
 # ----------------------------
-# GERAR PDF PROFISSIONAL
+# GERAR PDF
 # ----------------------------
 
 def gerar_pdf():
@@ -71,7 +96,6 @@ def gerar_pdf():
 
     y = altura - 50
 
-    # CABEÇALHO
     c.setFont("Helvetica-Bold", 18)
     c.drawString(50, y, "RELATÓRIO MÉDICO")
 
@@ -92,34 +116,6 @@ def gerar_pdf():
 
     y -= 40
 
-    # HISTÓRIA CLÍNICA
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, "História clínica")
-
-    y -= 25
-
-    c.setFont("Helvetica", 11)
-
-    for linha in st.session_state.transcricao_total.split("\n"):
-
-        c.drawString(50, y, linha[:95])
-
-        y -= 15
-
-        if y < 120:
-            c.showPage()
-            y = altura - 50
-
-    y -= 20
-
-    # PRONTUÁRIO
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, "Prontuário médico")
-
-    y -= 25
-
-    c.setFont("Helvetica", 11)
-
     for linha in st.session_state.analise_total.split("\n"):
 
         c.drawString(50, y, linha[:95])
@@ -130,19 +126,10 @@ def gerar_pdf():
             c.showPage()
             y = altura - 50
 
-    # ASSINATURA
-    y -= 40
-
-    c.line(50, y, 300, y)
-
-    y -= 15
-
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, "Assinatura do médico")
-
     c.save()
 
     return arquivo
+
 
 # ----------------------------
 # FORMULÁRIO PACIENTE
@@ -161,7 +148,7 @@ if not st.session_state.patient_started:
 
     dob = st.date_input(
         "Data de nascimento",
-        min_value=date(1900, 1, 1),
+        min_value=date(1900,1,1),
         max_value=date.today()
     )
 
@@ -185,6 +172,7 @@ if not st.session_state.patient_started:
 
     st.stop()
 
+
 # ----------------------------
 # SIDEBAR
 # ----------------------------
@@ -203,8 +191,9 @@ if st.sidebar.button("Novo paciente"):
 
     st.rerun()
 
+
 # ----------------------------
-# CONSULTA POR ÁUDIO
+# CONSULTA
 # ----------------------------
 
 st.header("Consulta")
@@ -223,25 +212,35 @@ if audio:
 
         audio_path = temp_audio.name
 
-    st.write("Transcrevendo...")
-
     texto = transcrever_audio(audio_path)
 
     st.session_state.transcricao_total += "\n\n" + texto
 
-    st.subheader("Nova transcrição")
+    contexto_paciente = f"""
+Paciente: {st.session_state.patient_name}
+Sexo: {st.session_state.patient_sex}
+Idade: {st.session_state.patient_age}
+Data da consulta: {date.today().strftime('%d/%m/%Y')}
+"""
 
-    st.write(texto)
+    texto_completo = contexto_paciente + "\n\n" + st.session_state.transcricao_total
 
-    st.subheader("Histórico da consulta")
+    analise = analisar_consulta(texto_completo)
 
-    st.write(st.session_state.transcricao_total)
+    analise = limpar_texto(analise)
 
-    st.write("Gerando prontuário...")
+    cabecalho = f"""
+Prontuário médico
 
-    analise = analisar_consulta(st.session_state.transcricao_total)
+- Paciente: {st.session_state.patient_name}
+- Sexo: {st.session_state.patient_sex}
+- Idade: {st.session_state.patient_age}
+- Data da consulta: {date.today().strftime('%d/%m/%Y')}
 
-    st.session_state.analise_total = analise
+"""
+
+    st.session_state.analise_total = cabecalho + analise
+
 
 # ----------------------------
 # PRONTUÁRIO
@@ -251,9 +250,64 @@ if st.session_state.analise_total:
 
     st.subheader("Prontuário médico")
 
-    st.write(st.session_state.analise_total)
+    st.markdown(st.session_state.analise_total)
 
     st.code(st.session_state.analise_total)
+
+
+# ----------------------------
+# SOLICITAR BIÓPSIA
+# ----------------------------
+
+if st.session_state.transcricao_total:
+
+    if st.checkbox("Solicitar biópsia"):
+
+        pedido = gerar_pedido_biopsia(st.session_state.transcricao_total)
+
+        st.subheader("Pedido anatomopatológico")
+
+        st.write(pedido)
+
+
+# ----------------------------
+# GERAR LAUDO PARA PACIENTE
+# ----------------------------
+
+if st.session_state.transcricao_total:
+
+    if st.checkbox("Gerar laudo para paciente"):
+
+        laudo = gerar_laudo_paciente(
+            st.session_state.transcricao_total,
+            st.session_state.analise_total
+        )
+
+        st.subheader("Laudo médico para paciente")
+
+        st.write(laudo)
+
+        st.code(laudo)
+
+
+# ----------------------------
+# INTERPRETAR LAUDO
+# ----------------------------
+
+st.divider()
+
+st.header("Interpretar anatomopatológico")
+
+laudo = st.text_area("Cole o laudo anatomopatológico")
+
+if laudo:
+
+    if st.button("Interpretar laudo"):
+
+        interpretacao = interpretar_laudo(laudo)
+
+        st.write(interpretacao)
+
 
 # ----------------------------
 # FINALIZAR CONSULTA
@@ -276,47 +330,31 @@ if st.button("Gerar PDF médico"):
             mime="application/pdf"
         )
 
-# ----------------------------
-# INTERPRETAR LAUDO
-# ----------------------------
-
-st.divider()
-
-st.header("Interpretar anatomopatológico")
-
-laudo = st.text_area("Cole o laudo anatomopatológico")
-
-if laudo:
-
-    if st.button("Interpretar laudo"):
-
-        interpretacao = interpretar_laudo(laudo)
-
-        st.write(interpretacao)
 
 # ----------------------------
-# ANÁLISE DE IMAGEM
+# IMAGEM DERMATOLÓGICA
 # ----------------------------
 
 st.divider()
 
 st.header("Imagem dermatológica")
 
-modo = st.radio(
-    "Enviar imagem",
-    ["Câmera", "Upload"]
+imagem = st.file_uploader(
+    "Upload da imagem",
+    type=["jpg","jpeg","png"]
 )
 
-if modo == "Câmera":
+if st.button("Usar câmera"):
 
-    imagem = st.camera_input("Fotografar lesão")
+    st.session_state.camera_ativa = True
 
-else:
+if st.session_state.camera_ativa:
 
-    imagem = st.file_uploader(
-        "Upload da imagem",
-        type=["jpg", "jpeg", "png"]
-    )
+    imagem_camera = st.camera_input("Fotografar lesão")
+
+    if imagem_camera:
+
+        imagem = imagem_camera
 
 if imagem:
 
