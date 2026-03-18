@@ -6,6 +6,23 @@ from streamlit_mic_recorder import mic_recorder
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+# ----------------------------
+# LOGIN SIMPLES
+# ----------------------------
+
+SENHA_ACESSO = "derm2025"
+
+if "logged" not in st.session_state:
+    st.title("Derm AI Copilot")
+    st.write("Acesso restrito")
+
+    senha = st.text_input("Digite a senha de acesso", type="password")
+
+    if senha == SENHA_ACESSO:
+        st.session_state.logged = True
+        st.rerun()
+    else:
+        st.stop()
 from src.transcriber import transcrever_audio
 from src.clinical_ai import analisar_consulta
 from src.image_analysis import analisar_imagem
