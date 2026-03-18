@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import date
 import tempfile
 import re
+import sqlite3
 from streamlit_mic_recorder import mic_recorder
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -15,6 +16,64 @@ from src.melanoma_abcd import analisar_abcd
 from src.biopsy_request import gerar_pedido_biopsia
 from src.patient_report import gerar_laudo_paciente
 
+
+# ----------------------------
+# BANCO DE DADOS
+# ----------------------------
+
+def conectar_db():
+    return sqlite3.connect("derm_ai.db", check_same_thread=False)
+
+def criar_tabelas():
+
+    conn = conectar_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS patients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        sexo TEXT,
+        data_nascimento TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS consultas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_name TEXT,
+        data_consulta TEXT,
+        transcricao TEXT,
+        analise TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+criar_tabelas()
+
+
+def salvar_consulta(nome, transcricao, analise):
+
+    conn = conectar_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    INSERT INTO consultas (patient_name, data_consulta, transcricao, analise)
+    VALUES (?, ?, ?, ?)
+    """, (
+        nome,
+        date.today().strftime("%Y-%m-%d"),
+        transcricao,
+        analise
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+# ----------------------------
 
 st.set_page_config(page_title="Derm AI Copilot", layout="wide")
 
@@ -241,6 +300,16 @@ Prontuário médico
 
     st.session_state.analise_total = cabecalho + analise
 
+    # ----------------------------
+    # SALVAR CONSULTA NO BANCO
+    # ----------------------------
+
+    salvar_consulta(
+        st.session_state.patient_name,
+        st.session_state.transcricao_total,
+        st.session_state.analise_total
+    )
+
 
 # ----------------------------
 # PRONTUÁRIO
@@ -379,3 +448,26 @@ if imagem:
         abcd = analisar_abcd(img_path)
 
         st.write("Score ABCD:", abcd["score"])
+
+
+# ----------------------------
+# HISTÓRICO DE CONSULTAS
+# ----------------------------
+
+st.divider()
+st.header("Histórico de consultas")
+
+conn = conectar_db()
+cursor = conn.cursor()
+
+cursor.execute("""
+SELECT patient_name, data_consulta
+FROM consultas
+ORDER BY id DESC
+LIMIT 20
+""")
+
+consultas = cursor.fetchall()
+
+for c in consultas:
+    st.write(f"{c[0]} - {c[1]}")
