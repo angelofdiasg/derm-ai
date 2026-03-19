@@ -276,28 +276,6 @@ if st.session_state.analise_total:
 
     st.code(st.session_state.analise_total)
 
-
-# ----------------------------
-# HISTÓRICO
-# ----------------------------
-
-st.divider()
-st.header("Histórico de consultas")
-
-conn = conectar_db()
-cursor = conn.cursor()
-
-cursor.execute("""
-SELECT patient_name, data_consulta
-FROM consultas
-ORDER BY id DESC
-LIMIT 20
-""")
-
-consultas = cursor.fetchall()
-
-for c in consultas:
-    st.write(f"{c[0]} - {c[1]}")
 # ----------------------------
 # SOLICITAR BIÓPSIA
 # ----------------------------
