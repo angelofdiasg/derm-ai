@@ -364,6 +364,8 @@ if imagem:
         img_path = temp_img.name
 
     resultado = analisar_imagem(img_path)
+    st.session_state.imagem_resultado = resultado
+    st.session_state.imagem_path = img_path
 
     st.subheader("Análise da imagem")
 
@@ -373,11 +375,31 @@ if imagem:
 
     st.image(img_detect)
 
-    if st.checkbox("Screening melanoma ABCD"):
+if st.checkbox("Screening melanoma ABCD"):
 
-        abcd = analisar_abcd(img_path)
+    from src.melanoma.melanoma_clinico import gerar_relatorio_clinico_abcd
 
-        st.write("Score ABCD:", abcd["score"])
+    abcd = analisar_abcd(img_path)
+
+    relatorio = gerar_relatorio_clinico_abcd(abcd)
+
+    # 👇 SALVA PARA O CHAT USAR
+    st.session_state.abcd_resultado = relatorio
+
+    st.subheader("Screening melanoma (ABCD)")
+
+    st.write("Score:", relatorio["score"])
+    st.write("Classificação:", relatorio["risco"])
+
+    st.write("Análise detalhada:")
+    for item in relatorio["explicacoes"]:
+        st.write("-", item)
+
+    st.write("Conduta sugerida:")
+    st.write(relatorio["conduta"])
+
+
+# 👇 FORA DO IF (IMPORTANTE)
 from src.chat_assistant import render_chat
 
 render_chat()

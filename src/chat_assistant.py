@@ -14,29 +14,56 @@ def render_chat():
 
     if st.button("Enviar pergunta"):
 
-        if not st.session_state.transcricao_total:
-            st.warning("Nenhuma consulta ainda.")
+        # -------------------------
+        # CONTEXTO MULTIMODAL
+        # -------------------------
+        contexto = ""
+
+        # TEXTO
+        if st.session_state.transcricao_total:
+            contexto += f"\nCONSULTA:\n{st.session_state.transcricao_total}\n"
+
+        # IMAGEM
+        if "imagem_resultado" in st.session_state:
+            contexto += f"\nANÁLISE DA IMAGEM:\n{st.session_state.imagem_resultado}\n"
+
+        # ABCD
+        if "abcd_resultado" in st.session_state:
+            contexto += "\nSCREENING MELANOMA:\n"
+            contexto += f"Score: {st.session_state.abcd_resultado['score']}\n"
+            contexto += f"Risco: {st.session_state.abcd_resultado['risco']}\n"
+
+        # Se não houver nada
+        if not contexto:
+            st.warning("Nenhum dado clínico ou imagem disponível.")
             return
 
-        contexto = st.session_state.transcricao_total
-
+        # -------------------------
+        # PROMPT
+        # -------------------------
         prompt = f"""
-Você é um dermatologista especialista atuando como CONSULTOR CLÍNICO.
+Você é um dermatologista especialista.
+
+Você pode receber:
+- dados clínicos (consulta)
+- análise de imagem
+- screening de melanoma
+
+Use TODAS as informações disponíveis.
 
 IMPORTANTE:
+- Se houver imagem, priorize análise dermatológica
+- Se não houver texto, responda baseado na imagem
 - NÃO repita o prontuário
-- NÃO reescreva o caso
-- NÃO liste tudo novamente
+- Seja direto e clínico
 
-Responda APENAS a pergunta do médico de forma direta e prática.
-
-CASO CLÍNICO:
+CONTEXTO:
 {contexto}
 
 PERGUNTA:
 {pergunta}
 
-Responda em no máximo 5 linhas, de forma objetiva e prática.
+Responda como um especialista, em no máximo 5 linhas.
 """
 
         resposta = analisar_consulta(prompt)
@@ -44,5 +71,8 @@ Responda em no máximo 5 linhas, de forma objetiva e prática.
         st.session_state.chat_history.append(("Você", pergunta))
         st.session_state.chat_history.append(("IA", resposta))
 
+    # -------------------------
+    # HISTÓRICO
+    # -------------------------
     for autor, msg in st.session_state.chat_history:
         st.write(f"**{autor}:** {msg}")
