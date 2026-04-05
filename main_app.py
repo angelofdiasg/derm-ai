@@ -244,29 +244,17 @@ from src.audio_chunker import transcrever_audio_grande
 
 if audio:
 
-    # 👇 salva no disco
-    audio_path = salvar_audio_seguro(
-        audio["bytes"],
-        st.session_state.patient_name
-    )
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+        temp_audio.write(audio["bytes"])
+        audio_path = temp_audio.name
 
-    # 👇 barra de progresso + transcrição
-    progress_bar = st.progress(0)
-
-    texto = transcrever_audio_grande(
-        audio_path,
-        transcrever_audio,
-        progress_bar=progress_bar
-    )
-
-    progress_bar.empty()
+    texto = transcrever_audio(audio_path)
 
     st.session_state.transcricao_total += "\n\n" + texto
 
     texto_completo = st.session_state.transcricao_total
 
     analise = analisar_consulta(texto_completo)
-
     analise = analise.replace("*", "")
 
     st.session_state.analise_total = analise
@@ -391,24 +379,28 @@ if st.checkbox("Screening melanoma ABCD"):
 
     from src.melanoma.melanoma_clinico import gerar_relatorio_clinico_abcd
 
-    abcd = analisar_abcd(img_path)
+    img_path = st.session_state.get("imagem_path")
 
-    relatorio = gerar_relatorio_clinico_abcd(abcd)
+    if img_path:
+        abcd = analisar_abcd(img_path)
+        relatorio = gerar_relatorio_clinico_abcd(abcd)
 
-    # 👇 SALVA PARA O CHAT USAR
-    st.session_state.abcd_resultado = relatorio
+        # 👇 SALVA PARA O CHAT USAR
+        st.session_state.abcd_resultado = relatorio
 
-    st.subheader("Screening melanoma (ABCD)")
+        st.subheader("Screening melanoma (ABCD)")
 
-    st.write("Score:", relatorio["score"])
-    st.write("Classificação:", relatorio["risco"])
+        st.write("Score:", relatorio["score"])
+        st.write("Classificação:", relatorio["risco"])
 
-    st.write("Análise detalhada:")
-    for item in relatorio["explicacoes"]:
-        st.write("-", item)
+        st.write("Análise detalhada:")
+        for item in relatorio["explicacoes"]:
+            st.write("-", item)
 
-    st.write("Conduta sugerida:")
-    st.write(relatorio["conduta"])
+        st.write("Conduta sugerida:")
+        st.write(relatorio["conduta"])
+    else:
+        st.warning("Envie uma imagem antes de usar o ABCD")
 
 
 # 👇 FORA DO IF (IMPORTANTE)
