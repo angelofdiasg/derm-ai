@@ -229,6 +229,8 @@ if st.sidebar.button("Novo paciente"):
 # CONSULTA
 # ----------------------------
 
+from src.audio_chunker import transcrever_audio_grande  # 👈 IMPORTANTE
+
 st.header("Consulta")
 
 audio = mic_recorder(
@@ -237,14 +239,27 @@ audio = mic_recorder(
     just_once=True
 )
 
+from src.audio_saver import salvar_audio_seguro
+from src.audio_chunker import transcrever_audio_grande
+
 if audio:
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+    # 👇 salva no disco
+    audio_path = salvar_audio_seguro(
+        audio["bytes"],
+        st.session_state.patient_name
+    )
 
-        temp_audio.write(audio["bytes"])
-        audio_path = temp_audio.name
+    # 👇 barra de progresso + transcrição
+    progress_bar = st.progress(0)
 
-    texto = transcrever_audio(audio_path)
+    texto = transcrever_audio_grande(
+        audio_path,
+        transcrever_audio,
+        progress_bar=progress_bar
+    )
+
+    progress_bar.empty()
 
     st.session_state.transcricao_total += "\n\n" + texto
 
@@ -252,7 +267,6 @@ if audio:
 
     analise = analisar_consulta(texto_completo)
 
-    # remove asteriscos gerados pela IA
     analise = analise.replace("*", "")
 
     st.session_state.analise_total = analise
@@ -262,8 +276,6 @@ if audio:
         st.session_state.transcricao_total,
         st.session_state.analise_total
     )
-
-
 # ----------------------------
 # PRONTUÁRIO
 # ----------------------------
