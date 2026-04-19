@@ -68,20 +68,14 @@ if not st.session_state.logged_in:
         if st.button("Entrar"):
             if email_login and senha_login:
                 try:
-                    # Autenticação via Supabase
-                    auth_response = supabase.auth.sign_in_with_password({
-                        "email": email_login,
-                        "password": senha_login
-                    })
+                    # Verifica login direto na tabela
+                    response = supabase.table("user_subscriptions").select("*").eq("email", email_login).eq("senha", senha_login).execute()
                     
-                    user_email = auth_response.user.email
-                    st.session_state.user_email = user_email
-                    st.session_state.auth_token = auth_response.session.access_token
-
-                    # Verifica a assinatura
-                    assinatura = checar_assinatura(user_email)
-                    
-                    if assinatura:
+                    if response.data and len(response.data) > 0:
+                        assinatura = response.data[0]
+                        user_email = assinatura["email"]
+                        st.session_state.user_email = user_email
+                        
                         status = assinatura.get("status", "desativado")
                         data_fim_str = assinatura.get("data_fim")
                         
@@ -101,12 +95,12 @@ if not st.session_state.logged_in:
                                     st.success("Login efetuado com sucesso!")
                                     st.session_state.logged_in = True
                                     st.rerun()
-                            else:
-                                st.warning("Data de validade da assinatura não encontrada. Entre em contato com o suporte.")
-                    
+                    else:
+                        st.error("Falha no login. Verifique seu email e senha.")
+                        
                 except Exception as e:
                     # Pega a mensagem de erro da exception
-                    st.error("Falha no login. Verifique seu email e senha.")
+                    st.error(f"Erro ao consultar o banco de dados. {e}")
             else:
                 st.warning("Preencha email e senha.")
 
@@ -118,27 +112,19 @@ if not st.session_state.logged_in:
         if st.button("Cadastrar e Assinar"):
             if email_cad and senha_cad:
                 try:
-                    # 1. Cria usuário no Auth
-                    res = supabase.auth.sign_up({
-                        "email": email_cad,
-                        "password": senha_cad
-                    })
-                    
-                    # 2. Insere na tabela user_subscriptions
-                    # Pode acontecer de o usuário já ter se cadastrado no Auth em outra tentativa, 
-                    # então verificamos se já existe. Para simplificar, forçamos o insert.
-                    try:
+                    # Insere o usuário com tudo direto na tabela user_subscriptions
+                    response = supabase.table("user_subscriptions").select("email").eq("email", email_cad).execute()
+                    if response.data and len(response.data) > 0:
+                        st.warning("Este e-mail já está cadastrado.")
+                    else:
                         supabase.table("user_subscriptions").insert({
                             "email": email_cad,
+                            "senha": senha_cad,
                             "status": "desativado"
                         }).execute()
-                    except Exception as e:
-                        # Ignora se já existir
-                        pass
-                    
-                    st.success("Conta criada com sucesso! Por favor, ative seu plano para utilizar.")
-                    st.markdown(f"[💳 **Ative seu cadastro hoje adquirindo seu plano**]({STRIPE_PAYMENT_LINK})")
-                
+                        
+                        st.success("Conta criada com sucesso! Por favor, ative seu plano para utilizar.")
+                        st.markdown(f"[💳 **Ative seu cadastro hoje adquirindo seu plano**]({STRIPE_PAYMENT_LINK})")
                 except Exception as e:
                     st.error(f"Não foi possível criar a conta: {e}")
             else:
