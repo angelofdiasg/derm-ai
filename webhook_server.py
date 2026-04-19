@@ -45,18 +45,12 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         
         # Pega o email do cliente de forma garantida contra objetos limitados do SDK
         email = None
-        try:
-            cd = session.get('customer_details')
-            if cd:
-                if hasattr(cd, 'email'):
-                    email = cd.email
-                elif 'email' in cd:
-                    email = cd['email']
-        except Exception:
-            pass
+        cd = getattr(session, 'customer_details', None)
+        if cd:
+            email = getattr(cd, 'email', None)
             
         if not email:
-            email = session.get('customer_email')
+            email = getattr(session, 'customer_email', None)
             
         if email and supabase:
             atualizar_assinatura(email)
@@ -67,7 +61,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     elif event['type'] == 'invoice.payment_succeeded':
         # Também pode ser usado para renovações automáticas
         invoice = event['data']['object']
-        email = invoice.get('customer_email')
+        email = getattr(invoice, 'customer_email', None)
         if email and supabase:
             atualizar_assinatura(email)
             print(f"Renovação efetuada para o email: {email}")
