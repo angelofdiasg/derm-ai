@@ -89,13 +89,13 @@ if not st.session_state.logged_in:
                         
                         if status == "desativado":
                             st.error(f"Ative seu cadastro hoje")
-                            st.markdown(f"[💳 **Clique aqui para pagar no Stripe**]({STRIPE_PAYMENT_LINK})")
+                            st.markdown(f"[💳 **Clique aqui para ativar seu plano**]({STRIPE_PAYMENT_LINK})")
                         elif status == "ativo":
                             if data_fim_str:
                                 data_fim = date.fromisoformat(data_fim_str)
                                 if hoje > data_fim:
                                     st.warning("Garanta mais tempo e reative seu cadastro")
-                                    st.markdown(f"[💳 **Clique aqui para pagar no Stripe e renovar**]({STRIPE_PAYMENT_LINK})")
+                                    st.markdown(f"[💳 **Clique aqui para reativar seu cadastro**]({STRIPE_PAYMENT_LINK})")
                                 else:
                                     # Acesso Permitido
                                     st.success("Login efetuado com sucesso!")
@@ -137,7 +137,7 @@ if not st.session_state.logged_in:
                         pass
                     
                     st.success("Conta criada com sucesso! Por favor, ative seu plano para utilizar.")
-                    st.markdown(f"[💳 **Ative seu cadastro hoje pagando no Stripe**]({STRIPE_PAYMENT_LINK})")
+                    st.markdown(f"[💳 **Ative seu cadastro hoje adquirindo seu plano**]({STRIPE_PAYMENT_LINK})")
                 
                 except Exception as e:
                     st.error(f"Não foi possível criar a conta: {e}")
