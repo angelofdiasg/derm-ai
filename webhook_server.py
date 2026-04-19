@@ -43,13 +43,19 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
         
-        # Pega o email do cliente (Pode vir de customer_details ou do client_reference_id se você usou na criação do link)
+        # Pega o email do cliente de forma garantida contra objetos limitados do SDK
         email = None
-        if 'customer_details' in session and session['customer_details']:
-            email = session['customer_details'].get('email')
+        try:
+            cd = session.get('customer_details')
+            if cd:
+                if hasattr(cd, 'email'):
+                    email = cd.email
+                elif 'email' in cd:
+                    email = cd['email']
+        except Exception:
+            pass
             
         if not email:
-            # Alternativa se usou customer_email no checkout session
             email = session.get('customer_email')
             
         if email and supabase:
