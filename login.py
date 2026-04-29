@@ -58,7 +58,49 @@ if not st.session_state.logged_in:
         st.warning("Aguardando configurações do Supabase nas variáveis de ambiente.")
         st.stop()
 
-    tab1, tab2 = st.tabs(["Login", "Cadastrar"])
+    # Recuperação de senha: Se houver 'code' na URL, o usuário clicou no link do e-mail
+    if "code" in st.query_params:
+        try:
+            # Troca o código por uma sessão
+            supabase.auth.exchange_code_for_session(st.query_params["code"])
+            # Remove o code da URL para não processar de novo
+            st.query_params.clear()
+            st.session_state.show_reset_password = True
+            st.rerun()
+        except Exception as e:
+            st.error(f"O link de recuperação é inválido ou expirou. {e}")
+            st.query_params.clear()
+
+    # Fluxo de redefinição de senha
+    if st.session_state.get("show_reset_password", False):
+        st.subheader("Redefinir Senha")
+        st.write("Digite sua nova senha abaixo.")
+        nova_senha = st.text_input("Nova Senha", type="password", key="new_pwd")
+        confirmar_senha = st.text_input("Confirmar Nova Senha", type="password", key="conf_new_pwd")
+        
+        if st.button("Atualizar Senha"):
+            if nova_senha and nova_senha == confirmar_senha:
+                try:
+                    # Atualiza a senha do usuário autenticado pela sessão do link
+                    supabase.auth.update_user({"password": nova_senha})
+                    st.success("Senha atualizada com sucesso! Faça login com a nova senha.")
+                    st.session_state.show_reset_password = False
+                    supabase.auth.sign_out()
+                except Exception as e:
+                    st.error(f"Erro ao atualizar a senha: {e}")
+            elif nova_senha != confirmar_senha:
+                st.warning("As senhas não coincidem.")
+            else:
+                st.warning("Preencha a nova senha.")
+        
+        if st.button("Voltar ao Login"):
+            st.session_state.show_reset_password = False
+            supabase.auth.sign_out()
+            st.rerun()
+
+        st.stop() # Impede de mostrar as abas de login
+
+    tab1, tab2, tab3 = st.tabs(["Login", "Cadastrar", "Esqueci a Senha"])
 
     with tab1:
         st.write("Digite suas credenciais")
@@ -143,6 +185,20 @@ if not st.session_state.logged_in:
                     st.error(f"Não foi possível criar a conta: {e}")
             else:
                 st.warning("Preencha email e senha.")
+
+    with tab3:
+        st.write("Insira seu e-mail para receber um link de recuperação.")
+        email_rec = st.text_input("Email", key="email_rec")
+        
+        if st.button("Enviar link de recuperação"):
+            if email_rec:
+                try:
+                    supabase.auth.reset_password_email(email_rec)
+                    st.success("Se o e-mail estiver cadastrado, você receberá um link de recuperação em breve.")
+                except Exception as e:
+                    st.error("Erro ao solicitar a recuperação. Tente novamente.")
+            else:
+                st.warning("Preencha o e-mail.")
 
     st.stop()  # 🔴 impede execução do app antes do login
 
